@@ -12,7 +12,7 @@
     "src/components/Pagination.astro": "359cc414405f43017a567927c82101f4c3dd15109d5ad7d056ad5b1dde5b6ed6",
     "src/content.config.ts": "748af472f170889046cd847778564de4e06a29ef9fd588d40f575223170acc8b",
     "src/env.d.ts": "5a498a2ff3c0abb338aff60209dfe32fb591fc5ad359182c5a14910f4c2fff8f",
-    "src/layouts/Base.astro": "ed6eaeefe56c5400fc8ff03ba969ca9ba36458bbb3bf8b12f14ebcf56f070e44",
+    "src/layouts/Base.astro": "1864a9f8b3c671a5c13c20e28df0bdd05b4e7032b931f74f5ee8dd1b288ba23c",
     "src/lib/actor.ts": "5ae4224b66d0d193093f66e38b1cfa1619946d5bc4126fdc7ca2f8b8ce5963ba",
     "src/lib/feed.ts": "ba1895c220520c426e98f2e23d2790c97297897eddbfb2ba41d9972e497c0895",
     "src/lib/gallery.ts": "6ff57a609f7954c3a35de0ab68e20329ac39a72d94e3f72f0a33312ba7f4f6c3",
@@ -28,7 +28,7 @@
     "src/pages/rss-styles.xsl.ts": "090c2cddc84602ede7bf0a8e9b8bb99d3dcb9e2990465d3c462401ed2e826775",
     "src/pages/rss.xml.ts": "2d3218b5032c45b3e34824f7518c9c94cce3d12de2dbad4a3925d4e4a347553e",
     "src/pages/search.json.ts": "b8848d5cef2ef76ed7673e6db4fc220d913d9b85a32e5c807f3f4292bc4d5a35",
-    "src/styles/global.css": "0b1d9e96b3409f98763025276639e3587baee4fb0074c24159da096f3b59d78b",
+    "src/styles/global.css": "c1950f5bcc6aac69158a332a7270d63a7236221148a6540cf92582de19b32566",
     "src/styles/lightbox.css": "681611752062aa3dbe2ffede63938fafefdf10f63c0b5242e08184cb64b36f7f",
     "src/styles/views.css": "7d5b9e7e69905f53ba9d544ce0a8baa042548f08a1bca454695feb2f4638f992"
   }

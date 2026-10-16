@@ -10,6 +10,7 @@ import { fontSizeAttrs } from '@fediblog/core/lib/font-sizes';
 import ThemeColors from '@fediblog/core/components/ThemeColors.astro';
 import PreviewSidebar from '@fediblog/core/components/PreviewSidebar.astro';
 import Footer from '@fediblog/core/components/Footer.astro';
+import '@fediblog/core/styles/fonts.css';
 import '../styles/global.css';
 // ?raw: texto fuente real de config.ts, para que «Exportar» en el panel de
 // vista previa parta del archivo tal cual (comentarios incluidos) — ver
@@ -61,11 +62,6 @@ const canonicalUrl = new URL(Astro.url.pathname, Astro.site || 'https://ejemplo.
     <link rel="alternate" type="application/rss+xml" title={`${SITE.site.title} — RSS`} href={`${base}rss.xml`} />
     <link rel="alternate" type="application/feed+json" title={`${SITE.site.title} — JSON Feed`} href={`${base}feed.json`} />
     <link rel="sitemap" href={`${base}sitemap-index.xml`} />
-
-    <!-- Google Fonts: Inter (Sans), Newsreader (Serif / Publico Text aesthetic), JetBrains Mono (Mono) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet" />
 
     <script is:inline define:vars={{ darkMode: SITE.site.darkMode, sizes: resolved.sizes, defaultSize: resolved.defaultSize, views: resolvedViews.views, defaultView: resolvedViews.defaultView }}>
       (function () {
