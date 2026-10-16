@@ -1,0 +1,299 @@
+---
+import type { Nota } from '@fediblog/core/lib/notas';
+import { groupNotasByMonth } from '../lib/gallery';
+import { SITE } from '../config';
+
+interface Props {
+  notas: Nota[];
+}
+
+const { notas } = Astro.props;
+
+// En la vista previa (demo con cuenta test o live preview), distribuimos las fotos en varios días
+// para que el calendario no aparezca con todas las publicaciones en una única casilla.
+const isPreview = SITE.handle.includes('fediblogtest') || import.meta.env.PUBLIC_FB_LIVE_PREVIEW === '1';
+
+const calendarNotas = (isPreview && notas.length > 0)
+  ? (() => {
+      // Días espaciados a lo largo del mes (de más reciente a más antiguo)
+      const spreadDays = [28, 25, 22, 19, 16, 13, 10, 7, 4, 1];
+      return notas.map((nota, idx) => {
+        const origDate = new Date(nota.data.date);
+        const day = spreadDays[idx % spreadDays.length];
+        const fakeDate = new Date(origDate.getFullYear(), origDate.getMonth(), day, origDate.getHours(), origDate.getMinutes(), origDate.getSeconds());
+        return {
+          ...nota,
+          data: {
+            ...nota.data,
+            date: fakeDate,
+          },
+        };
+      });
+    })()
+  : notas;
+
+const months = groupNotasByMonth(calendarNotas);
+const forcedAspect = SITE.gallery?.aspectRatio && SITE.gallery.aspectRatio !== 'original'
+  ? (SITE.gallery.aspectRatio === 'square' ? '1 / 1' : SITE.gallery.aspectRatio)
+  : null;
+
+import { splitLeadTitle } from '@fediblog/core/lib/format';
+
+const initialNota = calendarNotas[0];
+const initialDate = initialNota ? initialNota.data.date : null;
+const initialDayStr = initialDate ? String(initialDate.getDate()).padStart(2, '0') : '';
+const initialMonthStr = initialDate ? String(initialDate.getMonth() + 1).padStart(2, '0') : '';
+const initialDateStr = initialDate ? `${initialDayStr}/${initialMonthStr}/${initialDate.getFullYear()}` : '';
+const initialText = initialNota ? (initialNota.data.description || initialNota.data.plainText || initialNota.data.excerpt || '') : '';
+const initialParas = initialText.trim().split(/\n\s*\n/).filter(Boolean);
+const { title: initialTitle, body: initialBodyParas } = splitLeadTitle(initialParas);
+const initialUrl = initialNota?.data.sourceUrl || '';
+---
+
+<div id="calendarView" class="calendar-page-layout" style="display: none;">
+  <!-- Izquierda: el calendario -->
+  <div class="calendar-center-col">
+    <div class="calendar-wrapper">
+      {months.map((m, mIdx) => (
+        <section class="calendar-month-section" id={`month-${m.key}`}>
+          <div class="calendar-grid">
+            {(() => {
+              const daysInMonth = m.daysInMonth;
+              const lastDate = new Date(m.year, m.month - 1, daysInMonth);
+              const startCol = (1 - lastDate.getDay() + 7) % 7;
+
+              const rows: (number | null)[][] = [];
+              let currentRow = new Array(7).fill(null);
+              let col = startCol;
+
+              for (let day = daysInMonth; day >= 1; day--) {
+                currentRow[col] = day;
+                if (col === 6 || day === 1) {
+                  rows.push(currentRow);
+                  currentRow = new Array(7).fill(null);
+                  col = 0;
+                } else {
+                  col++;
+                }
+              }
+
+              const firstPhotoRowIdx = rows.findIndex(row => row.some(day => day !== null && m.entriesByDay[day]));
+              const activeRows = (mIdx === 0 && firstPhotoRowIdx > 0) ? rows.slice(firstPhotoRowIdx) : rows;
+              const allCells = activeRows.flat();
+
+              return allCells.map(day => {
+                if (day === null) {
+                  return (
+                    <div class="calendar-cell is-empty is-pad" aria-hidden="true">
+                      <div class="cell-num">&nbsp;</div>
+                      <div
+                        class="cell-box"
+                        style={forcedAspect ? `aspect-ratio: ${forcedAspect};` : undefined}
+                      ></div>
+                    </div>
+                  );
+                }
+
+                const dayNotas = m.entriesByDay[day] || [];
+                const hasEntry = dayNotas.length > 0;
+                const dayStr = String(day).padStart(2, '0');
+                const isFirstDay = day === 1;
+                const allImages = dayNotas.flatMap((n) => (n.data.images || []).map((i) => i.src));
+                const primaryNota = dayNotas[0];
+
+                const fullText = primaryNota ? (primaryNota.data.description || primaryNota.data.plainText || primaryNota.data.excerpt || '') : '';
+                const payload = hasEntry ? {
+                  id: primaryNota.id,
+                  date: primaryNota.data.date.toISOString(),
+                  url: primaryNota.data.sourceUrl,
+                  text: fullText.trim(),
+                  images: allImages,
+                } : null;
+
+                return (
+                  <div
+                    class:list={[
+                      'calendar-cell',
+                      hasEntry ? 'has-entry' : 'is-empty',
+                      isFirstDay && 'is-first-day',
+                    ]}
+                    data-entry={payload ? JSON.stringify(payload) : undefined}
+                    data-day={dayStr}
+                    data-month={String(m.month).padStart(2, '0')}
+                    data-year={m.year}
+                    tabindex={hasEntry ? 0 : undefined}
+                    role={hasEntry ? 'button' : undefined}
+                    aria-label={hasEntry ? `Publicación del ${dayStr}/${String(m.month).padStart(2, '0')}/${m.year}` : undefined}
+                  >
+                    <div class="cell-num">
+                      {isFirstDay ? `${dayStr} ${m.monthName.slice(0, 3)}` : dayStr}
+                    </div>
+
+                    <div
+                      class="cell-box"
+                      style={forcedAspect ? `aspect-ratio: ${forcedAspect};` : undefined}
+                    >
+                      {hasEntry ? (
+                        <div
+                          class="cell-img-wrap"
+                          style={forcedAspect ? `aspect-ratio: ${forcedAspect};` : undefined}
+                        >
+                          <img
+                            src={allImages[0]}
+                            alt=""
+                            loading="lazy"
+                            class="cell-img"
+                            draggable="false"
+                          />
+                          {allImages.length > 1 && (
+                            <span class="cell-img-badge">+{allImages.length - 1}</span>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+        </section>
+      ))}
+    </div>
+  </div>
+
+  <!-- Derecha: texto del día seleccionado / con el ratón encima -->
+  <aside class="calendar-right-col" id="calendarRightCol" aria-live="polite">
+    <div class="calendar-side-card" id="calendarSideCard">
+      <a class="calendar-side-date" id="calendarSideDate" href={initialUrl || undefined} target="_blank" rel="noopener noreferrer" title="Abrir la publicación original">{initialDateStr}</a>
+      <div class="calendar-side-text" id="calendarSideText">
+        {initialTitle && (
+          <h1 class="calendar-side-title">{initialTitle}</h1>
+        )}
+        {initialBodyParas.map(p => (
+          <p class="calendar-side-p">{p}</p>
+        ))}
+      </div>
+    </div>
+  </aside>
+</div>
+
+<style>
+  /* Calendario a la izquierda, texto del día a la derecha. */
+  :global(.notas-page.view-calendar) .calendar-page-layout {
+    display: grid !important;
+    grid-template-columns: minmax(0, var(--cal-w, 800px)) clamp(16rem, 26vw, 24rem) !important;
+    justify-content: center !important;
+    align-items: start !important;
+    gap: clamp(1.5rem, 3vw, 3rem) !important;
+    width: 100% !important;
+    max-width: 1500px !important;
+    margin: 0 auto !important;
+    padding: 1rem 1.5rem 4rem;
+    box-sizing: border-box;
+  }
+
+  .calendar-center-col {
+    min-width: 0;
+  }
+
+  .calendar-right-col {
+    width: 100%;
+    position: sticky;
+    top: 0.5rem;
+    padding: 0 0 0 clamp(1rem, 2vw, 2rem);
+    border-left: 1px solid var(--border, color-mix(in srgb, currentColor 14%, transparent));
+    box-sizing: border-box;
+  }
+
+  .calendar-side-card {
+    display: flex;
+    flex-direction: column;
+    /* Mismo hueco que entre el número del día y la foto: la fecha queda a la
+       altura de los números y el texto a la de la primera fila de fotos. */
+    gap: 5px;
+    transition: opacity 0.18s ease;
+  }
+
+  a.calendar-side-date { text-decoration: none; }
+  a.calendar-side-date:hover { color: var(--text-title); }
+  .calendar-side-date {
+    font-family: var(--mono);
+    font-size: var(--fs-xs);
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+  }
+
+  /* El título y los párrafos los inserta el script al pasar el ratón (no llevan el atributo de ámbito de Astro): estilos globales. */
+  :global(.calendar-side-title) {
+    font-family: var(--font-current);
+    font-size: var(--cal-title, 1.15rem);
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--text-title);
+    margin: 0 0 0.75rem;
+    letter-spacing: -0.01em;
+  }
+
+  .calendar-side-text {
+    font-family: var(--font-current);
+    font-size: var(--cal-text, 0.9rem);
+    font-weight: 300;
+    line-height: 1.8;
+    letter-spacing: 0.015em;
+    color: var(--text);
+    word-break: break-word;
+    max-height: calc(100vh - 12rem);
+    overflow-y: auto;
+    padding-right: 0.5rem;
+    scrollbar-width: thin;
+  }
+
+  .calendar-side-text :global(p),
+  :global(.calendar-side-p) {
+    margin: 0 0 1.15em;
+  }
+
+  .calendar-side-text :global(p:last-child),
+  :global(.calendar-side-p:last-child) {
+    margin-bottom: 0;
+  }
+
+
+  /* Pantallas estrechas: solo el calendario (el texto no cabe junto a él). */
+  @media (max-width: 900px) {
+    :global(.notas-page.view-calendar) .calendar-page-layout {
+      display: block !important;
+      padding: 1rem 0.5rem 4rem !important;
+    }
+    :global(.notas-page.view-calendar) .calendar-right-col {
+      display: none !important;
+    }
+  }
+
+  /* Garantía absoluta: si no está en vista calendario, NUNCA mostrar */
+  :global(.notas-page:not(.view-calendar)) #calendarView,
+  :global(#galleryPage:not(.view-calendar)) #calendarView {
+    display: none !important;
+  }
+</style>
+
+<script>
+  // El diseño (calendario | texto) lo resuelve el CSS; aquí solo se muestra u oculta el bloque según la vista activa.
+  function initCalendarVisibility() {
+    const layout = document.getElementById('calendarView');
+    const page = document.getElementById('galleryPage');
+    if (!layout || !page) return;
+    const sync = () => {
+      if (!page.classList.contains('view-calendar')) layout.style.display = 'none';
+      else layout.style.removeProperty('display');
+    };
+    new MutationObserver(sync).observe(page, { attributes: true, attributeFilter: ['class'] });
+    sync();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCalendarVisibility);
+  } else {
+    initCalendarVisibility();
+  }
+</script>

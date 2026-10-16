@@ -1,0 +1,355 @@
+---
+import type { Nota } from '@fediblog/core/lib/notas';
+import { splitLeadTitle } from '@fediblog/core/lib/format';
+import { SITE } from '../config';
+
+interface Props {
+  notas: Nota[];
+}
+
+const { notas } = Astro.props;
+const forcedAspect = SITE.gallery?.aspectRatio && SITE.gallery.aspectRatio !== 'original'
+  ? (SITE.gallery.aspectRatio === 'square' ? '1 / 1' : SITE.gallery.aspectRatio)
+  : null;
+
+const firstNota = notas[0];
+const firstDate = firstNota ? firstNota.data.date : null;
+const firstDateShort = firstDate
+  ? `${String(firstDate.getDate()).padStart(2, '0')}/${String(firstDate.getMonth() + 1).padStart(2, '0')}/${firstDate.getFullYear()}`
+  : '';
+const firstUrl = firstNota?.data.sourceUrl || '#';
+---
+
+<div id="imagesView" class="notes-images-view" style="display: flex; flex-direction: column;">
+  <div class="images-stage">
+    {notas.map((nota, idx) => {
+      const d = nota.data.date;
+      const dayStr = String(d.getDate()).padStart(2, '0');
+      const monthStr = String(d.getMonth() + 1).padStart(2, '0');
+      const dateShort = `${dayStr}/${monthStr}/${d.getFullYear()}`;
+      const imgObj = nota.data.images?.[0];
+      const imgSrc = imgObj?.src || '';
+      const fullText = nota.data.description || nota.data.plainText || nota.data.excerpt || '';
+
+      const payload = {
+        id: nota.id,
+        date: nota.data.date.toISOString(),
+        dateShort,
+        url: nota.data.sourceUrl,
+        text: fullText.trim(),
+        image: imgSrc,
+      };
+
+      const paragraphs = fullText.trim().split(/\n\s*\n/).filter(Boolean);
+      const { title: leadTitle, body: bodyParas } = splitLeadTitle(paragraphs);
+
+      return (
+        <div
+          class:list={['images-slide', { 'is-active': idx === 0 }]}
+          data-slide-idx={idx}
+          data-entry={JSON.stringify(payload)}
+          aria-hidden={idx === 0 ? 'false' : 'true'}
+        >
+          <div class="images-slide-inner">
+            <!-- Fotografía a la izquierda -->
+            <div
+              class="images-photo-pane calendar-cell has-entry"
+              data-entry={JSON.stringify(payload)}
+              tabindex="0"
+              role="button"
+              aria-label={`Publicación del ${dateShort}`}
+            >
+              <div
+                class="images-img-wrap"
+                style={forcedAspect ? `aspect-ratio: ${forcedAspect};` : undefined}
+              >
+                <img
+                  src={imgSrc}
+                  alt={imgObj?.alt || nota.data.title || ''}
+                  loading={idx === 0 ? 'eager' : 'lazy'}
+                  class="images-main-img"
+                  draggable="false"
+                />
+              </div>
+            </div>
+
+            <!-- Texto a la derecha -->
+            <div class="images-text-pane">
+              <div class="images-content-scroll">
+                {leadTitle && (
+                  <h1 class="images-title">{leadTitle}</h1>
+                )}
+                {bodyParas.map((p) => (
+                  <p class="images-paragraph">{p}</p>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+
+  <!-- Debajo de ambos, centrado y siempre en la misma posición -->
+  <div class="images-bottom-pane">
+    <a
+      href={firstUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="images-date-link"
+      id="imagesDateLink"
+      title="Ver publicación original"
+    >
+      {firstDateShort}
+    </a>
+
+    <div class="images-nav-bar">
+      <button type="button" class="images-nav-btn prev" id="imagesPrevBtn" aria-label="Anterior">
+        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+
+      <span class="images-counter" id="imagesCounter">01 / {String(notas.length).padStart(2, '0')}</span>
+
+      <button type="button" class="images-nav-btn next" id="imagesNextBtn" aria-label="Siguiente">
+        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .notes-images-view {
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+  }
+
+  :global(.notas-page:not(.view-images)) #imagesView,
+  :global(#galleryPage:not(.view-images)) #imagesView {
+    display: none !important;
+  }
+
+  .images-stage {
+    flex: 1 1 0;
+    min-height: 0;
+    width: 100%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .images-slide {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: scale(0.98);
+  }
+
+  .images-slide.is-active {
+    opacity: 1;
+    pointer-events: auto;
+    transform: scale(1);
+    z-index: 2;
+  }
+
+  .images-slide-inner {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 3.5rem;
+    width: 100%;
+    max-width: 1350px;
+    height: auto;
+    max-height: 100%;
+    padding: 0 1rem;
+    box-sizing: border-box;
+  }
+
+  /* Fotografía */
+  .images-photo-pane {
+    flex: 0 1 auto;
+    max-width: 58%;
+    height: auto;
+    align-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-sizing: border-box;
+  }
+
+  .images-img-wrap {
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0 !important;
+    overflow: hidden;
+    line-height: 0;
+  }
+
+  .images-main-img {
+    max-height: 62vh;
+    max-width: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    display: block;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+  }
+
+  .images-photo-pane:hover .images-main-img {
+    opacity: 0.92;
+    transform: scale(1.008);
+  }
+
+  /* Texto a la derecha */
+  .images-text-pane {
+    flex: 0 0 380px;
+    max-width: 420px;
+    height: auto;
+    align-self: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    box-sizing: border-box;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .images-content-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 0.75rem;
+    scrollbar-width: thin;
+  }
+
+  .images-title {
+    font-family: var(--font-current);
+    font-size: 1.05rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--text-title);
+    margin: 0 0 0.85rem;
+    letter-spacing: -0.01em;
+  }
+
+  .images-paragraph {
+    font-family: var(--font-current);
+    font-size: 0.84rem;
+    font-weight: 300;
+    line-height: 1.85;
+    letter-spacing: 0.015em;
+    color: var(--text);
+    margin: 0 0 1.25em;
+  }
+
+  .images-paragraph:first-child {
+    margin-top: 0;
+  }
+
+  .images-paragraph:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Paginación y fecha centradas debajo de ambos, siempre en la misma posición */
+  .images-bottom-pane {
+    flex: 0 0 auto;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    padding: 0.5rem 0 0.25rem;
+    z-index: 5;
+  }
+
+  .images-nav-bar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+  }
+
+  .images-counter {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+  }
+
+  .images-date-link {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .images-date-link:hover {
+    color: var(--text-title);
+  }
+
+  .images-nav-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding: 0.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: color 0.15s ease, transform 0.15s ease;
+  }
+
+  .images-nav-btn:hover {
+    color: var(--text-title);
+    transform: scale(1.15);
+  }
+
+  @media (max-width: 900px) {
+    .images-slide-inner {
+      flex-direction: column;
+      gap: 1.5rem;
+      max-height: 100%;
+      overflow-y: auto;
+    }
+    .images-photo-pane {
+      max-width: 100%;
+      max-height: 45vh;
+    }
+    .images-text-pane {
+      max-width: 100%;
+      width: 100%;
+      height: auto;
+    }
+  }
+</style>

@@ -1,0 +1,311 @@
+/* ── Modal / Lightbox Visual de Mallo ───────────────────────────────────── */
+.nota-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--bg);
+  opacity: 0;
+  transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  cursor: default;
+}
+
+.nota-modal.is-open {
+  opacity: 1;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  z-index: 1;
+}
+
+.modal-container {
+  position: relative;
+  z-index: 2;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Botón de cierre: solo la cruz sin borde ni sombra */
+.modal-close-btn {
+  position: fixed;
+  top: 1.5rem;
+  right: 2rem;
+  z-index: 200;
+  background: transparent !important;
+  color: var(--text-title);
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 !important;
+  border: none !important;
+  outline: none !important;
+  transition: transform 0.15s ease, opacity 0.15s ease, color 0.15s ease;
+  opacity: 0.65;
+  cursor: pointer;
+  box-shadow: none !important;
+}
+
+.modal-close-btn:hover {
+  opacity: 1;
+  transform: scale(1.15);
+  background: transparent !important;
+  color: var(--text-title);
+  box-shadow: none !important;
+  border: none !important;
+}
+
+[data-theme="dark"] .modal-close-btn {
+  box-shadow: none !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+.modal-content {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 3rem;
+  width: 100vw;
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  margin: 0;
+  box-sizing: border-box;
+  padding: 0 5.5rem 0 2rem;
+  overflow: hidden;
+}
+
+.modal-content.no-text {
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+}
+
+/* Visor de fotografía: usa absolutamente toda la altura sin márgenes superiores */
+.modal-gallery {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  width: auto;
+  max-width: calc(100% - 440px);
+  height: 100vh;
+  max-height: 100vh;
+  position: relative;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+.modal-content.no-text .modal-gallery {
+  flex: 0 0 100%;
+  width: 100%;
+  max-width: 100%;
+}
+
+.modal-carousel-stage {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  max-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+}
+
+.modal-active-img {
+  max-width: 100%;
+  max-height: 100vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Columna de texto derecha con márgenes amplios y sin solapamiento con la X */
+.modal-body {
+  flex: 0 0 400px;
+  width: 400px;
+  max-width: 420px;
+  height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 1.5rem 2rem 0;
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-meta-bottom {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  margin-top: auto;
+  padding-top: 2.25rem;
+  padding-bottom: 1rem;
+  border-top: 1px solid var(--accent-soft);
+  letter-spacing: 0.06em;
+}
+
+.modal-date-link {
+  color: var(--text-muted);
+  transition: color 0.15s ease;
+}
+
+.modal-date-link:hover {
+  color: var(--text-title);
+}
+
+.modal-text-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-text {
+  font-family: var(--font-current);
+  font-size: 0.85rem;
+  font-weight: 300;
+  line-height: 1.85;
+  letter-spacing: 0.015em;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.modal-text h1,
+.modal-title {
+  font-family: var(--font-current);
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-title);
+  margin: 0 0 0.85rem;
+  letter-spacing: -0.01em;
+}
+
+.modal-text p {
+  margin: 0 0 1.4em;
+}
+
+.modal-text p:first-child {
+  margin-top: 0;
+}
+
+.modal-text p:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 900px) {
+  .modal-content {
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 3rem 1.5rem 1.5rem;
+    overflow-y: auto;
+  }
+
+  .modal-gallery {
+    max-width: 100%;
+    width: 100%;
+    height: 50vh;
+    max-height: 50vh;
+  }
+
+  .modal-carousel-stage {
+    height: 50vh;
+    max-height: 50vh;
+  }
+
+  .modal-active-img {
+    max-height: 50vh;
+  }
+
+  .modal-body {
+    max-width: 100%;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    padding: 0 1rem 3rem 0;
+    overflow-y: visible;
+  }
+
+  .modal-close-btn {
+    top: 1rem;
+    right: 1rem;
+  }
+}
+
+/* Pantallas grandes: la foto y su texto forman una sola composición centrada,
+   con aire alrededor, en vez de estirarse a todo el ancho y el alto. */
+@media (min-width: 901px) {
+  .modal-content {
+    width: min(100vw, 78rem);
+    max-width: 78rem;
+    margin: 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(2rem, 4vw, 4rem);
+    padding: 0 clamp(2rem, 5vw, 4.5rem);
+  }
+
+  .modal-gallery,
+  .modal-carousel-stage {
+    height: min(84vh, 62rem);
+    max-height: min(84vh, 62rem);
+  }
+
+  /* La galería se ciñe a la foto: el texto queda pegado a ella, no al borde. */
+  .modal-gallery {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .modal-carousel-stage {
+    width: auto;
+  }
+
+  .modal-active-img {
+    max-height: 100%;
+  }
+
+  .modal-body {
+    flex: 0 0 min(22rem, 32%);
+    width: min(22rem, 32%);
+    max-width: none;
+    height: min(84vh, 62rem);
+    max-height: min(84vh, 62rem);
+    padding: 0.25rem 0 0.5rem;
+    justify-content: flex-start;
+  }
+
+  .modal-text-wrap {
+    margin: 0;
+  }
+
+  .modal-content.no-text .modal-gallery {
+    flex: 1 1 100%;
+  }
+}

@@ -1,0 +1,35 @@
+---
+---
+
+<div id="notaModal" class="nota-modal" aria-hidden="true" role="dialog" aria-modal="true">
+  <div class="modal-backdrop"></div>
+  <div class="modal-container">
+    <button class="modal-close-btn" id="modalClose" aria-label="Cerrar" title="Cerrar (Esc)">
+      <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+
+    <div class="modal-content">
+      <!-- Visor de Fotografía: usa absolutamente toda la altura sin márgenes superiores -->
+      <div class="modal-gallery" id="modalGallery">
+        <div class="modal-carousel-stage">
+          <img id="modalActiveImg" src="" alt="" class="modal-active-img" />
+        </div>
+      </div>
+
+      <!-- Columna derecha: texto alineado arriba a la altura de la foto, metadatos al fondo -->
+      <div class="modal-body" id="modalBody">
+        <div class="modal-text-wrap">
+          <div class="modal-text" id="modalText"></div>
+        </div>
+
+        <!-- Metadatos y enlace a Pixelfed SIEMPRE en la parte inferior -->
+        <div class="modal-meta-bottom">
+          <a id="modalDate" class="modal-date modal-date-link" href="#" target="_blank" rel="noopener noreferrer" title="Abrir la publicación original">00/00/0000</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

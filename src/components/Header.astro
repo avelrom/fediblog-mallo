@@ -1,0 +1,252 @@
+---
+import { isOff } from '@fediblog/core/lib/flags';
+import { SITE } from '../config';
+import ThemeToggle from '@fediblog/core/components/ThemeToggle.astro';
+import RssCopy from '@fediblog/core/components/RssCopy.astro';
+import SocialLinks from '@fediblog/core/components/SocialLinks.astro';
+import NavIcon from '@fediblog/core/components/Icon.astro';
+import { menuItem } from '@fediblog/core/lib/menu';
+
+interface Props {
+  currentPath?: string;
+}
+
+const { currentPath = '' } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const isAbout = currentPath.includes('/about') || currentPath.includes('/acerca');
+const isArchive = currentPath.includes('/archivo') || currentPath.includes('/etiquetas');
+const isRss = currentPath.includes('/rss') || currentPath.includes('/rss.xml');
+const isHome = currentPath.replace(/\/+$/, '') === base.replace(/\/+$/, '');
+
+const navIconsMode = (SITE.site as any)?.navIconsMode || 'both';
+const about = menuItem(SITE.site.menu, 'about', { label: 'about', icon: 'user' });
+const archive = menuItem(SITE.site.menu, 'archive', { label: 'archivo', icon: 'archive' });
+const rss = menuItem(SITE.site.menu, 'rss', { label: 'rss', icon: 'rss' });
+---
+
+<header class="site-header">
+  <div class="site-brand">
+    {isHome ? (
+      <h1 class="brand-heading">
+        <a href={base} class="brand-link" title="Inicio">
+          <span class="meta-title" data-preview-field="site.title" data-preview-type="text" data-preview-label="Título del sitio" data-preview-group="Cabecera" data-preview-sync-title="true">{SITE.site.title}</span>
+        </a>
+      </h1>
+    ) : (
+      <a href={base} class="brand-link" title="Inicio">
+        <span class="meta-title" data-preview-field="site.title" data-preview-type="text" data-preview-label="Título del sitio" data-preview-group="Cabecera" data-preview-sync-title="true">{SITE.site.title}</span>
+      </a>
+    )}
+    {SITE.site.tagline && (
+      <span class="meta-desc" data-preview-field="site.tagline" data-preview-type="text" data-preview-label="Subtítulo (tagline)" data-preview-group="Cabecera">{SITE.site.tagline}</span>
+    )}
+  </div>
+
+  <div class="site-nav-group">
+    <nav class="site-nav" data-icons-mode={navIconsMode} aria-label="Navegación principal">
+      {!isOff(SITE.profile?.show) && (
+      <a
+        href={`${base}about/`}
+        class:list={['nav-link', { active: isAbout }, about.icon && 'has-icon']}
+        title="Acerca de"
+        aria-label="Acerca de"
+      >
+        {about.icon && (
+          <span class="nav-icon" aria-hidden="true">
+            <NavIcon name={about.icon} size={15} />
+          </span>
+        )}
+        <span class="nav-label" data-preview-field="site.menu.about.label" data-preview-type="text" data-preview-label="«Acerca de»: texto del enlace" data-preview-group="Menú">{about.label}</span>
+      </a>
+      )}
+      {!isOff(SITE.archive?.show) && (
+      <a
+        href={`${base}archivo/`}
+        class:list={['nav-link', { active: isArchive }, archive.icon && 'has-icon']}
+        title="Archivo"
+        aria-label="Archivo"
+      >
+        {archive.icon && (
+          <span class="nav-icon" aria-hidden="true">
+            <NavIcon name={archive.icon} size={15} />
+          </span>
+        )}
+        <span class="nav-label" data-preview-field="site.menu.archive.label" data-preview-type="text" data-preview-label="«Archivo»: texto del enlace" data-preview-group="Menú">{archive.label}</span>
+      </a>
+      )}
+      <a
+        href={`${base}rss.xml`}
+        data-copy-rss={`${base}rss.xml`}
+        class:list={['nav-link', { active: isRss }, rss.icon && 'has-icon']}
+        title="Canal RSS"
+        aria-label="Canal RSS"
+      >
+        {rss.icon && (
+          <span class="nav-icon" aria-hidden="true">
+            <NavIcon name={rss.icon} size={15} />
+          </span>
+        )}
+        <span class="nav-label" data-preview-field="site.menu.rss.label" data-preview-type="text" data-preview-label="«RSS»: texto del enlace" data-preview-group="Menú">{rss.label}</span>
+      </a>
+      <button
+        type="button"
+        class="nav-icon-btn"
+        data-search-open
+        hidden
+        aria-label="Buscar"
+        title="Buscar (/)"
+      >
+        <NavIcon name="search" size={15} />
+      </button>
+      {SITE.site.darkMode === 'toggle' && (
+        <div class="header-theme-toggle">
+          <ThemeToggle />
+        </div>
+      )}
+    </nav>
+
+    <RssCopy />
+    <div class:list={['site-tools', SITE.site?.hideSocialOnMobile && 'hide-social-mobile']}>
+      <SocialLinks social={SITE.social} />
+    </div>
+  </div>
+
+</header>
+
+<style>
+  .site-header {
+    flex: 0 0 auto;
+    width: 100%;
+    padding: 0.65rem 0;
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem;
+    box-sizing: border-box;
+  }
+
+  .site-brand {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  .brand-heading {
+    display: contents;
+    margin: 0;
+    font: inherit;
+  }
+
+  .brand-link {
+    text-decoration: none;
+    color: var(--text-title);
+  }
+
+  .meta-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text-title);
+    line-height: 1.2;
+  }
+
+  .meta-desc {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  .site-header {
+    --nav-hover: color-mix(in srgb, var(--text-muted) 15%, transparent);
+  }
+
+  .site-nav-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 9.6px;
+    flex-shrink: 0;
+  }
+
+  .site-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 5.6px;
+  }
+
+  .nav-link {
+    font-family: var(--font-current);
+    font-size: 0.84rem;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.15s ease, background-color 0.15s ease;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    min-width: 26.4px;
+    height: 26.4px;
+    padding: 0 0.2rem;
+  }
+
+  .nav-link:hover {
+    color: var(--text-title);
+    background-color: var(--nav-hover);
+  }
+
+  .nav-link.active {
+    color: var(--text-title);
+    font-weight: 600;
+    background-color: var(--nav-hover);
+  }
+
+  .site-tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding-left: 12px;
+    border-left: 1px solid var(--accent-soft, rgba(128, 128, 128, 0.2));
+  }
+
+  .nav-icon-btn {
+    background: transparent;
+    border: none;
+    width: 26.4px;
+    height: 26.4px;
+    border-radius: 4px;
+    padding: 0;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    transition: color 0.15s ease, transform 0.15s ease;
+  }
+
+  .nav-icon-btn:hover {
+    color: var(--text-title);
+    background-color: var(--nav-hover);
+  }
+
+  .header-theme-toggle {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  @media (max-width: 44rem) {
+    .site-header {
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      padding-top: 0.5rem;
+    }
+    .site-brand .meta-desc {
+      display: none;
+    }
+    .site-tools.hide-social-mobile :global(.social) {
+      display: none;
+    }
+  }
+</style>

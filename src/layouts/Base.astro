@@ -1,0 +1,206 @@
+---
+import { SITE } from '../config';
+import { actor } from '../lib/actor';
+import Header from '../components/Header.astro';
+import SearchDialog from '@fediblog/core/components/SearchDialog.astro';
+import '@fediblog/core/styles/nav-icons.css';
+import ConfigFields from '@fediblog/core/components/ConfigFields.astro';
+import ThemeFontSizes from '@fediblog/core/components/ThemeFontSizes.astro';
+import { fontSizeAttrs } from '@fediblog/core/lib/font-sizes';
+import ThemeColors from '@fediblog/core/components/ThemeColors.astro';
+import PreviewSidebar from '@fediblog/core/components/PreviewSidebar.astro';
+import Footer from '@fediblog/core/components/Footer.astro';
+import '../styles/global.css';
+// ?raw: texto fuente real de config.ts, para que «Exportar» en el panel de
+// vista previa parta del archivo tal cual (comentarios incluidos) — ver
+// PreviewSidebar.astro. Import de Vite, no funciona con readFileSync porque
+// Astro empaqueta este layout fuera de su carpeta original en el build.
+import { resolveSizes, resolveViews } from '@fediblog/core/lib/view-size';
+import configSource from '../config.ts?raw';
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+  wide?: boolean;
+  /** Página de una entrada: solo ahí el título de la pestaña lleva el de la entrada. */
+  isPost?: boolean;
+}
+
+const {
+  title = SITE.site.title,
+  description = SITE.site.description,
+  image,
+  wide = false,
+  isPost = false,
+} = Astro.props;
+
+// Activado a mano (previewSidebar: true en config.ts) o automáticamente en
+// el despliegue de "Live Preview" de Fediblog vía variable de entorno — esa
+// variable nunca se commitea, así que no viaja al clonar la plantilla.
+const showPreviewSidebar =
+  SITE.site.previewSidebar || import.meta.env.PUBLIC_FB_LIVE_PREVIEW === '1';
+
+const VIEW_OPTIONS: [string, string][] = [['images', 'Imagen centrada'], ['dashboard', 'Mosaico'], ['calendar', 'Calendario']];
+const resolved = resolveSizes(SITE.gallery?.sizes, SITE.gallery?.defaultSize);
+const resolvedViews = resolveViews(['images', 'dashboard', 'calendar'] as const, SITE.gallery?.views, SITE.gallery?.defaultView);
+const pageTitle = isPost && title !== SITE.site.title ? `${title} — ${SITE.site.title}` : SITE.site.title;
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const canonicalUrl = new URL(Astro.url.pathname, Astro.site || 'https://ejemplo.com');
+---
+
+<!doctype html>
+<html {...fontSizeAttrs(SITE.site.fontSize)} lang={SITE.site.locale || 'es-ES'} data-font={SITE.site?.font || 'sans'}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg?v=2`} />
+    <link rel="alternate" type="application/rss+xml" title={`${SITE.site.title} — RSS`} href={`${base}rss.xml`} />
+    <link rel="alternate" type="application/feed+json" title={`${SITE.site.title} — JSON Feed`} href={`${base}feed.json`} />
+    <link rel="sitemap" href={`${base}sitemap-index.xml`} />
+
+    <!-- Google Fonts: Inter (Sans), Newsreader (Serif / Publico Text aesthetic), JetBrains Mono (Mono) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet" />
+
+    <script is:inline define:vars={{ darkMode: SITE.site.darkMode, sizes: resolved.sizes, defaultSize: resolved.defaultSize, views: resolvedViews.views, defaultView: resolvedViews.defaultView }}>
+      (function () {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          const fontParam = params.get('font');
+          if (fontParam) {
+            document.documentElement.setAttribute('data-font', fontParam);
+          }
+
+          const themeParam = params.get('theme');
+          let theme = darkMode === 'light' || darkMode === 'dark' ? darkMode : darkMode === 'toggle' ? (themeParam || localStorage.getItem('fb-theme')) : null;
+          if (!theme) {
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          document.documentElement.setAttribute('data-theme', theme);
+          if (themeParam && darkMode === 'toggle') localStorage.setItem('fb-theme', themeParam);
+
+          var viewParam = params.get('view');
+          var hash = window.location.hash.toLowerCase().replace(/^#/, '');
+          var aliases = { images: 'images', mosaico: 'dashboard', dashboard: 'dashboard', calendario: 'calendar', calendar: 'calendar' };
+          var storedView = aliases[hash] || aliases[viewParam] || localStorage.getItem('mallo-view') || defaultView;
+          if (views.indexOf(storedView) < 0) storedView = defaultView;
+          if (storedView) {
+            document.documentElement.setAttribute('data-view', storedView);
+            document.documentElement.setAttribute('data-layout', storedView);
+          }
+
+          var sizeParam = params.get('size');
+          var storedSize = sizeParam || localStorage.getItem('mallo-size') || defaultSize;
+          if (sizes.indexOf(storedSize) < 0) storedSize = defaultSize;
+          document.documentElement.setAttribute('data-size', storedSize);
+        } catch (e) {}
+      })();
+    </script>
+
+    <!-- Open Graph / Redes sociales -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    {image && <meta property="og:image" content={image} />}
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
+    {image && <meta name="twitter:image" content={image} />}
+
+    <meta name="generator" content={Astro.generator} />
+    <ThemeColors colors={SITE.site.colors} vars={{ accent: ['--accent'], title: ['--title-color'] }} titleSelectors={['.meta-title', '.post-title', '.images-title', '.archive-title', '.tag-title']} titleFallback="var(--text-title)" />
+    <ThemeFontSizes selectors={{ brand: ['.meta-title'], title: ['.images-title', '.archive-title', '.tag-title'], postTitle: ['.post-title'], body: ['.post-body', '.images-text-pane', '.calendar-side-text'] }} />
+  </head>
+  <body>
+    <a href="#main-content" class="skip-link">Saltar al contenido</a>
+    <div class:list={['layout-container', wide && 'wide']}>
+      <Header currentPath={Astro.url.pathname} />
+
+      <main id="main-content" class="site-main">
+        <slot />
+      </main>
+
+      <Footer authorName={actor.name} siteTitle={SITE.site.title} base={base} />
+    </div>
+
+    <SearchDialog />
+
+    {showPreviewSidebar && <><PreviewSidebar siteConfig={SITE} configSource={configSource} themeId="mallo" /><ConfigFields fieldOptions={{ 'gallery.views': VIEW_OPTIONS, 'gallery.defaultView': VIEW_OPTIONS }} siteConfig={SITE} colorVars={{ accent: ['--accent'], title: ['--title-color'] }} titleSample=".post-title, .meta-title" /></>}
+
+    <script is:inline>
+      (function () {
+        function externalizeLinks() {
+          var links = document.querySelectorAll('a[href]');
+          for (var i = 0; i < links.length; i++) {
+            var a = links[i];
+            var href = a.getAttribute('href');
+            if (!href) continue;
+            if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//')) {
+              try {
+                var url = new URL(href, window.location.href);
+                if (url.origin !== window.location.origin) {
+                  a.setAttribute('target', '_blank');
+                  var rel = (a.getAttribute('rel') || '').split(/\s+/).filter(Boolean);
+                  if (!rel.includes('noopener')) rel.push('noopener');
+                  if (!rel.includes('noreferrer')) rel.push('noreferrer');
+                  a.setAttribute('rel', rel.join(' '));
+                }
+              } catch (e) {}
+            }
+          }
+        }
+
+        function initCodeCopy() {
+          var pres = document.querySelectorAll('pre');
+          for (var j = 0; j < pres.length; j++) {
+            var pre = pres[j];
+            if (pre.querySelector('.code-copy-btn')) continue;
+            if (!pre.textContent || !pre.textContent.trim()) continue;
+            pre.classList.add('has-copy-btn');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'code-copy-btn';
+            btn.setAttribute('aria-label', 'Copiar código');
+            btn.setAttribute('title', 'Copiar código');
+            btn.innerHTML =
+              '<svg class="icon-copy" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>' +
+              '<svg class="icon-check" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+            (function (p, b) {
+              b.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var code = p.querySelector('code');
+                var text = (code ? code.innerText : p.innerText).replace(/\n$/, '');
+                navigator.clipboard.writeText(text).then(function () {
+                  b.classList.add('copied');
+                  setTimeout(function () {
+                    b.classList.remove('copied');
+                  }, 1800);
+                });
+              });
+            })(pre, btn);
+            pre.appendChild(btn);
+          }
+        }
+        window.initCodeCopy = initCodeCopy;
+
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', function () {
+            externalizeLinks();
+            initCodeCopy();
+          });
+        } else {
+          externalizeLinks();
+          initCodeCopy();
+        }
+      })();
+    </script>
+  </body>
+</html>

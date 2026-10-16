@@ -1,0 +1,170 @@
+---
+import type { Nota } from '@fediblog/core/lib/notas';
+
+interface Props {
+  notas: Nota[];
+}
+
+const { notas } = Astro.props;
+
+// Dividir en 5 columnas asimétricas con desfases y márgenes irregulares
+const numCols = 5;
+const cols: Array<Array<{ nota: Nota; idx: number }>> = Array.from({ length: numCols }, () => []);
+notas.forEach((nota, idx) => {
+  cols[idx % numCols].push({ nota, idx });
+});
+
+// Variaciones orgánicas de anchos, márgenes inferiores y ligeros desplazamientos laterales
+const widths = ['150px', '210px', '165px', '225px', '140px', '185px', '195px', '155px'];
+const margins = ['3.5rem', '6rem', '2.25rem', '7rem', '4rem', '2.75rem', '8rem', '3.25rem'];
+const shifts = ['0px', '14px', '-12px', '20px', '-8px', '10px', '-16px'];
+const colTops = ['0px', '65px', '20px', '110px', '40px'];
+---
+
+<div id="dashboardView" class="notes-dashboard-view" style="display: none;">
+  <div class="mosaic-scatter-container">
+    {cols.map((colItems, colIdx) => (
+      <div
+        class="mosaic-scatter-col"
+        style={`--col-top: ${colTops[colIdx % colTops.length]};`}
+      >
+        {colItems.map(({ nota, idx }) => {
+          const d = nota.data.date;
+          const dayStr = String(d.getDate()).padStart(2, '0');
+          const monthStr = String(d.getMonth() + 1).padStart(2, '0');
+          const dateShort = `${dayStr}/${monthStr}`;
+          const imgObj = nota.data.images?.[0];
+          const imgSrc = imgObj?.src || '';
+          const fullText = nota.data.description || nota.data.plainText || nota.data.excerpt || '';
+
+          const payload = {
+            id: nota.id,
+            date: nota.data.date.toISOString(),
+            url: nota.data.sourceUrl,
+            text: fullText.trim(),
+            image: imgSrc,
+          };
+
+          const itemWidth = widths[idx % widths.length];
+          const itemMargin = margins[(idx * 3) % margins.length];
+          const itemShift = shifts[(idx * 2) % shifts.length];
+
+          return (
+            <div
+              class="mosaic-item calendar-cell has-entry"
+              data-entry={JSON.stringify(payload)}
+              data-mosaic-idx={idx}
+              style={`--item-w: ${itemWidth}; --item-mb: ${itemMargin}; --item-shift: ${itemShift};`}
+              tabindex="0"
+              role="button"
+              aria-label={`Publicación del ${dateShort}`}
+            >
+              <div class="mosaic-img-wrap">
+                <img
+                  src={imgSrc}
+                  alt={imgObj?.alt || nota.data.title || ''}
+                  loading="lazy"
+                  class="mosaic-img"
+                  draggable="false"
+                />
+              </div>
+              <span class="mosaic-date">{dateShort}</span>
+            </div>
+          );
+        })}
+      </div>
+    ))}
+  </div>
+</div>
+
+<style>
+  .notes-dashboard-view {
+    width: 100%;
+    padding: 1.5rem 1rem 5rem;
+    box-sizing: border-box;
+  }
+
+  .mosaic-scatter-container {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 2.5rem;
+    width: 100%;
+    max-width: 1550px;
+    margin: 0 auto;
+    box-sizing: border-box;
+  }
+
+  .mosaic-scatter-col {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: var(--col-top, 0px);
+    box-sizing: border-box;
+  }
+
+  .mosaic-item {
+    display: flex;
+    flex-direction: column;
+    width: var(--item-w, 180px);
+    max-width: 100%;
+    margin-bottom: var(--item-mb, 3.5rem);
+    transform: translateX(var(--item-shift, 0px));
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+  }
+
+  .mosaic-item:hover {
+    opacity: 0.88;
+  }
+
+  .mosaic-img-wrap {
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .mosaic-img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 0 !important;
+  }
+
+  .mosaic-date {
+    display: block;
+    font-family: var(--font-current);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    margin-top: 0.45rem;
+  }
+
+  @media (max-width: 1100px) {
+    .mosaic-scatter-container {
+      gap: 1.5rem;
+    }
+    .mosaic-scatter-col:nth-child(5) {
+      display: none;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .mosaic-scatter-container {
+      gap: 1rem;
+    }
+    .mosaic-scatter-col:nth-child(4),
+    .mosaic-scatter-col:nth-child(5) {
+      display: none;
+    }
+    .mosaic-item {
+      width: 100% !important;
+      transform: none !important;
+    }
+  }
+</style>

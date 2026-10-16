@@ -1,0 +1,611 @@
+---
+import type { GetStaticPaths } from 'astro';
+import Base from '../layouts/Base.astro';
+import Pagination from '../components/Pagination.astro';
+import ViewSizeDock, { type ViewOption } from '@fediblog/core/components/ViewSizeDock.astro';
+import ImagesView from '../components/ImagesView.astro';
+import DashboardView from '../components/DashboardView.astro';
+import CalendarView from '../components/CalendarView.astro';
+import LightboxModal from '../components/LightboxModal.astro';
+import { getNotas } from '@fediblog/core/lib/notas';
+import { SITE } from '../config';
+import '../styles/views.css';
+import '../styles/lightbox.css';
+
+export const getStaticPaths = (async ({ paginate }) => {
+  const notas = await getNotas();
+  // `all` va a todas las páginas: el calendario necesita ver todas las entradas.
+  return paginate(notas, { pageSize: SITE.gallery.postsPerPage, props: { all: notas } });
+}) satisfies GetStaticPaths;
+
+const { page, all } = Astro.props;
+const notas = page.data;
+import { resolveSizes } from '@fediblog/core/lib/view-size';
+const { sizes, defaultSize } = resolveSizes(SITE.gallery?.sizes, SITE.gallery?.defaultSize);
+const ALL_VIEWS = ['images', 'dashboard', 'calendar'] as const;
+type View = (typeof ALL_VIEWS)[number];
+// Vistas que elige quien instala el tema; si la lista queda vacía o no vale, todas.
+const picked = ALL_VIEWS.filter((v) => (SITE.gallery?.views as readonly string[] | undefined)?.includes(v));
+const enabledViews: View[] = picked.length ? picked : [...ALL_VIEWS];
+const configured = SITE.gallery?.defaultView as View | undefined;
+const defaultView: View = configured && enabledViews.includes(configured) ? configured : enabledViews[0];
+const on = (v: View) => enabledViews.includes(v);
+
+const viewDefs: ViewOption[] = [
+  {
+    id: 'images',
+    label: 'Vista Imagen Centrada',
+    iconSvg: '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="1"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>',
+  },
+  {
+    id: 'dashboard',
+    label: 'Vista Mosaico',
+    iconSvg: '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>',
+  },
+  {
+    id: 'calendar',
+    label: 'Vista Calendario',
+    iconSvg: '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="1"></rect><line x1="16" x2="16" y1="2" y2="6"></line><line x1="8" x2="8" y1="2" y2="6"></line><line x1="3" x2="21" y1="10" y2="10"></line></svg>',
+  },
+].filter((v) => enabledViews.includes(v.id as View));
+---
+
+<Base wide={true} title={SITE.site.title} description={SITE.site.description}>
+  <div class:list={['page', 'notas-page', `view-${defaultView}`, 'is-full-width']} id="galleryPage" data-views={enabledViews.join(',')} data-default-view={defaultView}>
+    <div class="page-left">
+      <!-- Contenedor con scroll de la galería -->
+      <div class="notas-scroll-box" id="notasScrollBox">
+        {on('images') && <ImagesView notas={notas} />}
+        {on('dashboard') && <DashboardView notas={notas} />}
+        {on('calendar') && <CalendarView notas={all} />}
+      </div>
+    </div>
+  </div>
+
+  <Pagination
+    prev={page.url.prev || undefined}
+    next={page.url.next || undefined}
+    current={page.currentPage}
+    total={page.lastPage}
+  />
+
+  <!-- Selector flotante de vista y tamaño unificado -->
+  <ViewSizeDock
+    views={viewDefs}
+    activeView={defaultView}
+    sizes={sizes}
+    activeSize={defaultSize}
+    themeId="mallo"
+  />
+
+  <!-- Modal / Visor de Fotografía -->
+  <LightboxModal />
+</Base>
+
+<script>
+  import { wheelSteps } from "@fediblog/core/lib/wheel-steps";
+  type NoteView =
+    | 'images'
+    | 'dashboard'
+    | 'calendar';
+
+  function initGallery() {
+    const pageEl = document.getElementById('galleryPage');
+    const imagesView = document.getElementById('imagesView');
+    const dashboardView = document.getElementById('dashboardView');
+    const calendarView = document.getElementById('calendarView');
+    const scrollBox = document.getElementById('notasScrollBox');
+
+    const enabled = (pageEl?.dataset.views || '').split(',').filter(Boolean) as NoteView[];
+    const fallbackView = ((pageEl?.dataset.defaultView as NoteView) || enabled[0] || 'images');
+    let activeView: NoteView = fallbackView;
+
+    function escapeHtml(str: string): string {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function isStandaloneTitle(paragraph: string): boolean {
+      const clean = paragraph.replace(/\s+/g, ' ').trim();
+      if (!clean || clean.length > 160) return false;
+      if (/[.!?…]["»”')\]]?\s+\S/.test(clean)) return false;
+      return true;
+    }
+
+    function formatParagraphsHtml(text: string, titleClass = 'calendar-side-title', pClass = 'calendar-side-p'): string {
+      const paras = text.trim().split(/\n\s*\n/).filter(Boolean);
+      if (!paras.length) return '';
+      const first = paras[0].trim();
+      if ((paras.length > 1 && isStandaloneTitle(first)) || /^#+\s+/.test(first)) {
+        const titleText = escapeHtml(first.replace(/^#+\s*/, '').trim());
+        const bodyHtml = paras.slice(1).map(p => `<p class="${pClass}">${escapeHtml(p).replace(/\n/g, '<br>')}</p>`).join('');
+        return `<h1 class="${titleClass}">${titleText}</h1>${bodyHtml}`;
+      }
+      return paras.map(p => `<p class="${pClass}">${escapeHtml(p).replace(/\n/g, '<br>')}</p>`).join('');
+    }
+
+    function setView(view: NoteView) {
+      if (enabled.length && !enabled.includes(view)) view = fallbackView;
+      activeView = view;
+      document.documentElement.setAttribute('data-view', view);
+      document.documentElement.setAttribute('data-layout', view);
+      try {
+        localStorage.setItem('mallo-view', view);
+      } catch (_) {}
+
+      pageEl?.classList.remove(
+        'view-images',
+        'view-dashboard',
+        'view-calendar'
+      );
+      pageEl?.classList.add(`view-${view}`, 'is-full-width');
+
+      const views = [
+        imagesView,
+        dashboardView,
+        calendarView,
+      ];
+      views.forEach(v => {
+        if (v) v.classList.remove('view-animated');
+      });
+
+      if (imagesView) imagesView.style.display = view === 'images' ? 'flex' : 'none';
+      if (dashboardView) dashboardView.style.display = view === 'dashboard' ? 'block' : 'none';
+      if (calendarView) calendarView.style.display = view === 'calendar' ? 'block' : 'none';
+
+      let targetEl: HTMLElement | null = null;
+      if (view === 'images') targetEl = imagesView;
+      else if (view === 'dashboard') targetEl = dashboardView;
+      else if (view === 'calendar') targetEl = calendarView;
+
+      if (targetEl) {
+        void targetEl.offsetWidth;
+        targetEl.classList.add('view-animated');
+      }
+
+      if (scrollBox) scrollBox.scrollTop = 0;
+
+      if (view === 'images') {
+        setTimeout(syncImagesAlignment, 60);
+      }
+
+      const hashByView: Record<NoteView, string> = {
+        images: '',
+        dashboard: '#mosaico',
+        calendar: '#calendario',
+      };
+
+      const targetHash = hashByView[view];
+      const currentHash = window.location.hash.toLowerCase();
+
+      if (targetHash) {
+        if (currentHash !== targetHash) {
+          history.replaceState(null, '', targetHash);
+        }
+      } else {
+        if (currentHash && currentHash !== '#images' && currentHash !== '#inicio') {
+          history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
+      }
+    }
+
+    function getInitialView(): NoteView {
+      const hash = window.location.hash.toLowerCase().replace(/^#/, '');
+      const param = (new URLSearchParams(window.location.search).get('view') || '').toLowerCase();
+      const stored = (localStorage.getItem('mallo-view') || '').toLowerCase();
+      const rootAttr = (document.documentElement.getAttribute('data-view') || '').toLowerCase();
+      const aliases: Record<string, NoteView> = {
+        images: 'images',
+        mosaico: 'dashboard', dashboard: 'dashboard',
+        calendario: 'calendar', calendar: 'calendar',
+      };
+      const asked = aliases[hash] || aliases[param] || aliases[stored] || aliases[rootAttr];
+      // Solo una vista de las elegidas; si no, la configurada por defecto.
+      return asked && (!enabled.length || enabled.includes(asked)) ? asked : fallbackView;
+    }
+
+    const initialSize = localStorage.getItem('mallo-size') || document.documentElement.getAttribute('data-size') || 'md';
+    pageEl?.setAttribute('data-size', initialSize);
+
+    setView(getInitialView());
+
+    window.addEventListener('hashchange', () => {
+      setView(getInitialView());
+    });
+
+    window.addEventListener('view-change', (e: any) => {
+      if (e.detail?.view) setView(e.detail.view);
+    });
+
+    window.addEventListener('size-change', (e: any) => {
+      const s = e.detail?.size || 'md';
+      pageEl?.setAttribute('data-size', s);
+      document.documentElement.setAttribute('data-size', s);
+      try {
+        localStorage.setItem('mallo-size', s);
+      } catch (_) {}
+      window.dispatchEvent(new CustomEvent('gallery-size-change', { detail: { size: s } }));
+    });
+
+    // ── Navegación de diapositivas en ImagesView ──────────────────────────────
+    const slides = Array.from(document.querySelectorAll<HTMLElement>('.images-slide'));
+    let currentSlide = 0;
+
+    function syncImagesAlignment() {
+      if (activeView !== 'images' || window.innerWidth <= 900) return;
+      const activeSlide = slides[currentSlide];
+      if (!activeSlide) return;
+      const img = activeSlide.querySelector<HTMLImageElement>('.images-main-img');
+      const textPane = activeSlide.querySelector<HTMLElement>('.images-text-pane');
+      if (!img || !textPane) return;
+
+      const doSync = () => {
+        const rect = img.getBoundingClientRect();
+        if (rect.height > 0) {
+          textPane.style.height = `${Math.round(rect.height)}px`;
+          textPane.style.maxHeight = `${Math.round(rect.height)}px`;
+        }
+      };
+
+      if (img.complete && img.naturalHeight > 0) {
+        doSync();
+      } else {
+        img.onload = doSync;
+      }
+    }
+
+    const imagesCounterEl = document.getElementById('imagesCounter');
+    const imagesDateLinkEl = document.getElementById('imagesDateLink') as HTMLAnchorElement | null;
+    const imagesPrevBtn = document.getElementById('imagesPrevBtn');
+    const imagesNextBtn = document.getElementById('imagesNextBtn');
+
+    function showSlide(idx: number) {
+      if (!slides.length) return;
+      currentSlide = (idx + slides.length) % slides.length;
+      slides.forEach((slide, i) => {
+        const isActive = i === currentSlide;
+        slide.classList.toggle('is-active', isActive);
+        slide.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+        if (isActive) {
+          const scrollArea = slide.querySelector<HTMLElement>('.images-content-scroll');
+          if (scrollArea) scrollArea.scrollTop = 0;
+
+          if (imagesCounterEl) {
+            imagesCounterEl.textContent = `${String(currentSlide + 1).padStart(2, '0')} / ${String(slides.length).padStart(2, '0')}`;
+          }
+          if (imagesDateLinkEl && slide.dataset.entry) {
+            try {
+              const entry = JSON.parse(slide.dataset.entry);
+              imagesDateLinkEl.textContent = entry.dateShort || '';
+              imagesDateLinkEl.href = entry.url || '#';
+            } catch (_) {}
+          }
+        }
+      });
+      requestAnimationFrame(syncImagesAlignment);
+    }
+
+    imagesPrevBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showSlide(currentSlide - 1);
+    });
+
+    imagesNextBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showSlide(currentSlide + 1);
+    });
+
+    // Cambio de imagen con la rueda o el trackpad (una pasada larga recorre varias)
+    if (imagesView) {
+      wheelSteps(imagesView, {
+        handoff: false,
+        step: (dir) => showSlide(currentSlide + dir),
+        ignore: (e) => {
+          if (activeView !== 'images') return true;
+          // Sobre el texto (o un contenedor con scroll propio) la rueda es para leer.
+          const target = e.target as HTMLElement | null;
+          if (target?.closest('.images-text-pane')) return true;
+          const slideInner = target?.closest('.images-slide-inner') as HTMLElement | null;
+          return !!slideInner && slideInner.scrollHeight > slideInner.clientHeight;
+        },
+      });
+    }
+
+    // ── Hover en celdas para calendario ──────────────────────────────────────
+    const cells = document.querySelectorAll<HTMLElement>('.calendar-cell.has-entry');
+    cells.forEach(cell => {
+      cell.addEventListener('mouseenter', () => {
+        if (activeView !== 'calendar') return;
+
+        const entryData = cell.dataset.entry;
+        if (!entryData) return;
+        try {
+          const entry = JSON.parse(entryData);
+          const textContent = (entry.text || '').trim();
+
+          const calDate = document.getElementById('calendarSideDate') as HTMLAnchorElement | null;
+          const calText = document.getElementById('calendarSideText');
+          if (calDate && entry.date) {
+            const d = new Date(entry.date);
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            calDate.textContent = `${day}/${month}/${d.getFullYear()}`;
+          }
+          if (calText) {
+            calText.innerHTML = formatParagraphsHtml(textContent);
+          }
+          if (calDate) {
+            if (entry.url) calDate.href = entry.url;
+            else calDate.removeAttribute('href');
+          }
+        } catch (e) {
+          console.error('Error al parsear hover de entrada', e);
+        }
+      });
+    });
+
+    // ── Lightbox Modal ──────────────────────────────────────────────────────
+    const modal = document.getElementById('notaModal');
+    if (!modal) return;
+
+    const closeBtn = document.getElementById('modalClose');
+    const activeImg = document.getElementById('modalActiveImg') as HTMLImageElement | null;
+    const dateEl = document.getElementById('modalDate') as HTMLAnchorElement | null;
+    const textEl = document.getElementById('modalText');
+
+    let currentCell: HTMLElement | null = null;
+
+    function getVisibleCells(): HTMLElement[] {
+      let container: HTMLElement | null = null;
+      if (activeView === 'images') container = imagesView;
+      else if (activeView === 'dashboard') container = dashboardView;
+      else if (activeView === 'calendar') container = calendarView;
+
+      if (!container) return Array.from(document.querySelectorAll<HTMLElement>('.calendar-cell.has-entry'));
+      return Array.from(container.querySelectorAll<HTMLElement>('.calendar-cell.has-entry'));
+    }
+
+    const modalContent = modal?.querySelector('.modal-content') as HTMLElement | null;
+    const modalBody = modal?.querySelector('.modal-body') as HTMLElement | null;
+    const modalGallery = document.getElementById('modalGallery');
+
+    function syncModalTextTop() {
+      if (!modal || !modal.classList.contains('is-open') || !activeImg || !modalBody || window.innerWidth <= 900) {
+        if (modalBody && window.innerWidth <= 900) {
+          modalBody.style.paddingTop = '0px';
+          modalBody.style.paddingBottom = '2rem';
+        }
+        return;
+      }
+      const rect = activeImg.getBoundingClientRect();
+      if (rect.height > 0) {
+        // El texto arranca a la altura de la foto y los metadatos acaban a la de su borde
+        // inferior; se mide contra la caja del propio texto, no contra la ventana.
+        const box = modalBody.getBoundingClientRect();
+        modalBody.style.paddingTop = `${Math.max(0, Math.round(rect.top - box.top))}px`;
+        modalBody.style.paddingBottom = `${Math.max(0, Math.round(box.bottom - rect.bottom))}px`;
+      }
+    }
+
+    // Reenvío de rueda de ratón en visor modal desde la foto hacia el texto
+    modalGallery?.addEventListener('wheel', (e) => {
+      if (modalBody && modalBody.scrollHeight > modalBody.clientHeight) {
+        modalBody.scrollTop += e.deltaY;
+      }
+    }, { passive: true });
+
+    function openModal(cell: HTMLElement) {
+      currentCell = cell;
+      const entryData = cell.dataset.entry;
+      if (!entryData) return;
+      const entry = JSON.parse(entryData);
+      const d = new Date(entry.date);
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+
+      if (dateEl) dateEl.textContent = `${day}/${month}/${year}`;
+      if (dateEl) dateEl.href = entry.url || '#';
+
+      const imgSrc = entry.image || (entry.images && entry.images[0]) || '';
+      if (activeImg) {
+        activeImg.src = imgSrc;
+        if (activeImg.complete && activeImg.naturalHeight > 0) {
+          requestAnimationFrame(syncModalTextTop);
+        } else {
+          activeImg.onload = () => {
+            syncModalTextTop();
+          };
+        }
+      }
+
+      const textContent = (entry.text || '').trim();
+      const hasText = !!textContent;
+
+      if (textEl) {
+        if (hasText) {
+          textEl.innerHTML = formatParagraphsHtml(textContent, 'modal-title', 'modal-p');
+          textEl.style.display = 'block';
+        } else {
+          textEl.innerHTML = '';
+          textEl.style.display = 'none';
+        }
+      }
+
+      if (modalContent && modalBody) {
+        if (!hasText) {
+          modalBody.style.display = 'none';
+          modalContent.classList.add('no-text');
+        } else {
+          modalBody.style.display = 'flex';
+          modalContent.classList.remove('no-text');
+        }
+      }
+
+      modal!.style.display = 'block';
+      void modal!.offsetWidth;
+      modal!.classList.add('is-open');
+      modal!.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      requestAnimationFrame(syncModalTextTop);
+      // Diálogo de verdad (role="dialog" aria-modal="true"): el foco tiene
+      // que entrar en él al abrirse, si no un lector de pantalla no se
+      // entera de que ha pasado nada y el Tab sigue por detrás.
+      closeBtn?.focus();
+    }
+
+    function closeModal() {
+      modal!.classList.remove('is-open');
+      modal!.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+      // Devuelve el foco a la celda que abrió el modal, en vez de perderlo.
+      currentCell?.focus();
+      setTimeout(() => {
+        if (!modal!.classList.contains('is-open')) {
+          modal!.style.display = 'none';
+          currentCell = null;
+        }
+      }, 200);
+    }
+
+    // Con aria-modal="true" el foco no debería poder salir del diálogo
+    // mientras está abierto: se atrapa el Tab entre el primer y el último
+    // elemento enfocable de dentro.
+    modal.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab' || !modal!.classList.contains('is-open')) return;
+      const focusable = Array.from(
+        modal!.querySelectorAll<HTMLElement>('a[href], button:not([disabled])')
+      ).filter((el) => el.offsetParent !== null);
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    });
+
+    function navigateNext() {
+      const list = getVisibleCells();
+      if (!list.length) return;
+      const currentIdx = currentCell ? list.indexOf(currentCell) : -1;
+      const nextIdx = (currentIdx + 1) % list.length;
+      const nextCell = list[nextIdx];
+      if (nextCell) {
+        openModal(nextCell);
+      }
+    }
+
+    function navigatePrev() {
+      const list = getVisibleCells();
+      if (!list.length) return;
+      const currentIdx = currentCell ? list.indexOf(currentCell) : -1;
+      const prevIdx = (currentIdx - 1 + list.length) % list.length;
+      const prevCell = list[prevIdx];
+      if (prevCell) {
+        openModal(prevCell);
+      }
+    }
+
+    // ── Gestos táctiles Swipe en Modal para móviles ────────────────────────
+    let touchModalStartX = 0;
+    let touchModalStartY = 0;
+
+    modal.addEventListener('touchstart', (e) => {
+      touchModalStartX = e.touches[0].clientX;
+      touchModalStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    modal.addEventListener('touchend', (e) => {
+      const diffX = e.changedTouches[0].clientX - touchModalStartX;
+      const diffY = e.changedTouches[0].clientY - touchModalStartY;
+      if (Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY)) {
+        if (diffX < 0) {
+          navigateNext();
+        } else {
+          navigatePrev();
+        }
+      }
+    }, { passive: true });
+
+    cells.forEach(cell => {
+      cell.addEventListener('click', () => {
+        openModal(cell);
+      });
+
+      cell.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openModal(cell);
+        }
+      });
+    });
+
+    closeBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeModal();
+    });
+
+    // Cerrar al hacer clic fuera de la imagen o del texto
+    modal.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      // No cerrar si el clic es dentro del bloque de texto o metadatos
+      if (target.closest('.modal-body')) return;
+      // No cerrar si el clic es sobre la imagen activa
+      if (target === activeImg || target.id === 'modalActiveImg' || target.classList.contains('modal-active-img')) return;
+      // No cerrar si el clic es sobre un enlace
+      if (target.closest('a')) return;
+
+      closeModal();
+    });
+
+    window.addEventListener('resize', () => {
+      if (modal && modal.classList.contains('is-open')) {
+        syncModalTextTop();
+      }
+      if (activeView === 'images') {
+        syncImagesAlignment();
+      }
+    });
+
+    window.addEventListener('gallery-size-change', () => {
+      if (activeView === 'images') {
+        setTimeout(syncImagesAlignment, 40);
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (modal && modal.classList.contains('is-open')) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeModal();
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          navigatePrev();
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          navigateNext();
+        }
+      } else if (activeView === 'images') {
+        // En vista images y modal cerrado, las flechas cambian de foto
+        if (e.key === 'ArrowLeft') {
+          showSlide(currentSlide - 1);
+        } else if (e.key === 'ArrowRight') {
+          showSlide(currentSlide + 1);
+        }
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initGallery);
+  } else {
+    initGallery();
+  }
+</script>

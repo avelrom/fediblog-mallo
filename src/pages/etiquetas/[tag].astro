@@ -1,0 +1,86 @@
+---
+import Base from '../../layouts/Base.astro';
+import { getTags, getNotasByTagSlug } from '@fediblog/core/lib/notas';
+import { formatDate } from '@fediblog/core/lib/format';
+
+export async function getStaticPaths() {
+  const tags = await getTags();
+  return Promise.all(
+    tags.map(async (tag) => ({
+      params: { tag: tag.slug },
+      props: { tag, notas: await getNotasByTagSlug(tag.slug) },
+    })),
+  );
+}
+
+const { tag, notas } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+---
+
+<Base title={`#${tag.name}`} description={`Entradas etiquetadas #${tag.name}.`}>
+  <section class="tag-page">
+    <div class="subpage-nav-bar">
+      <a href={`${base}archivo/`} class="back-link">&larr; Archivo</a>
+    </div>
+    <h1 class="tag-title">#{tag.name}</h1>
+    <ul class="tag-grid">
+      {notas.map((nota) => {
+        const img = nota.data.images?.[0];
+        return (
+          <li>
+            <a href={`${base}${nota.id}/`} class="tag-tile">
+              {img ? (
+                <img src={img.src} alt={img.alt || ''} loading="lazy" />
+              ) : (
+                <span class="tag-tile-empty" aria-hidden="true">Aa</span>
+              )}
+              <span class="tag-tile-title">{nota.data.title}</span>
+              <time datetime={nota.data.date.toISOString()}>{formatDate(nota.data.date, 'dd/mm/yyyy')}</time>
+            </a>
+          </li>
+        );
+      })}
+    </ul>
+  </section>
+</Base>
+
+<style>
+  .tag-page { max-width: 72rem; margin: 0 auto; padding: 1rem 0 3rem; }
+  .subpage-nav-bar {
+    padding-bottom: 1.25rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .back-link {
+    font-size: var(--fs-xs);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .back-link:hover { color: var(--text-title); }
+  .tag-title { font-size: 1.35rem; font-weight: 500; color: var(--text-title); margin-bottom: 1.5rem; }
+  .tag-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    gap: 1.25rem;
+  }
+  .tag-tile { display: flex; flex-direction: column; gap: 0.35rem; }
+  .tag-tile img,
+  .tag-tile-empty {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    background: var(--bg-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+  }
+  .tag-tile-title { font-size: var(--fs-base); color: var(--text-title); }
+  .tag-tile time { font-size: var(--fs-xs); color: var(--text-muted); }
+  .tag-tile:hover .tag-tile-title { text-decoration: underline; text-underline-offset: 3px; }
+</style>

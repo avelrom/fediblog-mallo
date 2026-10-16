@@ -1,0 +1,12 @@
+---
+/** Página del editor: lo incrusta Fediblog (ver EditorFrame en @fediblog/core). */
+import Base from '../layouts/Base.astro';
+import { SITE } from '../config';
+import EditorFrame from '@fediblog/core/components/EditorFrame.astro';
+
+if (!SITE.editor.show) return Astro.redirect(import.meta.env.BASE_URL);
+---
+
+<Base title="Editor" description="Redacta en Markdown y publica en Mastodon o Pixelfed, con imágenes." wide>
+  <EditorFrame theme="mallo" />
+</Base>
